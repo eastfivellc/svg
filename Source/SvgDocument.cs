@@ -332,7 +332,7 @@ namespace Svg
         /// Attempts to create an SVG document from the specified string data.
         /// </summary>
         /// <param name="svg">The SVG data.</param>
-        public static T FromSvg<T>(string svg) where T : SvgDocument, new()
+        public static T FromSvg<T>(string svg, bool ignoreStyles = false) where T : SvgDocument, new()
         {
             if (string.IsNullOrEmpty(svg))
             {
@@ -346,7 +346,7 @@ namespace Svg
                     XmlResolver = new SvgDtdResolver(),
                     WhitespaceHandling = WhitespaceHandling.None
                 };
-                return Open<T>(reader);
+                return Open<T>(reader, ignoreStyles: ignoreStyles);
             }
         }
 
@@ -372,7 +372,7 @@ namespace Svg
             return Open<T>(reader);
         }
 
-        private static T Open<T>(XmlReader reader) where T : SvgDocument, new()
+        private static T Open<T>(XmlReader reader, bool ignoreStyles = false) where T : SvgDocument, new()
         {
             if (!SkipGdiPlusCapabilityCheck)
             {
@@ -467,7 +467,7 @@ namespace Svg
                 }
             }
 
-            if (styles.Any())
+            if (styles.Any() && (ignoreStyles == false))
             {
                 var cssTotal = styles.Select((s) => s.Content).Aggregate((p, c) => p + Environment.NewLine + c);
                 var cssParser = new Parser();
@@ -485,7 +485,7 @@ namespace Svg
                         {
                             foreach (var decl in rule.Declarations)
                             {
-                                elem.AddStyle(decl.Name, decl.Term.ToString(), rule.Selector.GetSpecificity());
+                                elem.AddStyle(decl.Name, decl.Term.ToString(), rule.Selector.GetSpecificity(), false);
                             }
                         }
                     }

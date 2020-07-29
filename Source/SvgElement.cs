@@ -47,24 +47,25 @@ namespace Svg
         private SvgCustomAttributeCollection _customAttributes;
         private List<ISvgNode> _nodes = new List<ISvgNode>();
 
-        private Dictionary<string, SortedDictionary<int, string>> _styles = new Dictionary<string, SortedDictionary<int, string>>();
-
+        private Dictionary<string, SortedDictionary<int, KeyValuePair<string, bool>>> _styles =
+            new Dictionary<string, SortedDictionary<int, KeyValuePair<string, bool>>>();
+        
         /// <summary>
         /// Add style.
         /// </summary>
         /// <param name="name">The style name.</param>
         /// <param name="value">The style value.</param>
         /// <param name="specificity">The specificity value.</param>
-        public void AddStyle(string name, string value, int specificity)
+        public void AddStyle(string name, string value, int specificity, bool sourced = true)
         {
-            SortedDictionary<int, string> rules;
+            SortedDictionary<int, KeyValuePair<string, bool>> rules;
             if (!_styles.TryGetValue(name, out rules))
             {
-                rules = new SortedDictionary<int, string>();
+                rules = new SortedDictionary<int, KeyValuePair<string, bool>>();
                 _styles[name] = rules;
             }
             while (rules.ContainsKey(specificity)) ++specificity;
-            rules[specificity] = value;
+            rules[specificity] = new KeyValuePair<string, bool>(value, sourced);
         }
 
         /// <summary>
@@ -83,9 +84,9 @@ namespace Svg
         {
             if (_styles.Any())
             {
-                var styles = new Dictionary<string, SortedDictionary<int, string>>();
+                var styles = new Dictionary<string, SortedDictionary<int, KeyValuePair<string, bool>>>();
                 foreach (var s in _styles)
-                    if (!SvgElementFactory.SetPropertyValue(this, s.Key, s.Value.Last().Value, OwnerDocument, true))
+                    if (!SvgElementFactory.SetPropertyValue(this, s.Key, s.Value.Last().Value.Key, OwnerDocument, true))
                         styles.Add(s.Key, s.Value);
                 _styles = styles;
             }
@@ -93,7 +94,7 @@ namespace Svg
 
         public bool ContainsAttribute(string name)
         {
-            SortedDictionary<int, string> rules;
+            SortedDictionary<int, KeyValuePair<string, bool>> rules;
             return (this.Attributes.ContainsKey(name) || this.CustomAttributes.ContainsKey(name) ||
                 (_styles.TryGetValue(name, out rules)) && (rules.ContainsKey(StyleSpecificity_InlineStyle) || rules.ContainsKey(StyleSpecificity_PresAttribute)));
         }
@@ -106,12 +107,20 @@ namespace Svg
                 return true;
             }
             if (this.CustomAttributes.TryGetValue(name, out value)) return true;
-            SortedDictionary<int, string> rules;
+            SortedDictionary<int, KeyValuePair<string, bool>> rules;
             if (_styles.TryGetValue(name, out rules))
             {
                 // Get staged styles that are 
-                if (rules.TryGetValue(StyleSpecificity_InlineStyle, out value)) return true;
-                if (rules.TryGetValue(StyleSpecificity_PresAttribute, out value)) return true;
+                if (rules.TryGetValue(StyleSpecificity_InlineStyle, out KeyValuePair<string, bool> tuple))
+                {
+                    value = tuple.Key;
+                    return true;
+                }
+                if (rules.TryGetValue(StyleSpecificity_PresAttribute, out KeyValuePair<string, bool> tuple2))
+                {
+                    value = tuple2.Key;
+                    return true;
+                }
             }
             return false;
         }
@@ -424,6 +433,47 @@ namespace Svg
         }
 
         /// <summary>
+        /// Gets the XPath of the element.
+        /// </summary>
+        public string XPath
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(this.ID))
+                    return $"//{this.ElementName}[@id='#{this.ID}']";
+
+                if (this.Parent == null)
+                {
+                    if (this.OwnerDocument == null)
+                        return "//";
+
+                    var pathValue = GetPathValue(this.OwnerDocument.Children);
+                    return $"//{pathValue}";
+                }
+
+                {
+                    var parentPath = this.Parent.XPath;
+                    var pathValue = GetPathValue(this.Parent.Children);
+                    return $"{parentPath}/{pathValue}";
+                }
+
+                string GetPathValue(IEnumerable<SvgElement> children)
+                {
+                    var thisElements = children
+                        .Where(child => child.ElementName == this.ElementName)
+                        .Select((cld, idx) => new KeyValuePair<SvgElement, int>(cld, idx))
+                        .Where((kvp) => kvp.Key == this);
+                    if (thisElements.Any())
+                    {
+                        var index = thisElements.First().Value;
+                        return $"{this.ElementName}[{index}]";
+                    }
+                    return $"{this.ElementName}";
+                }
+            }
+        }
+
+        /// <summary>
         /// Gets or sets the space handling.
         /// </summary>
         /// <value>The space handling.</value>
@@ -588,6 +638,7 @@ namespace Svg
                 writer.WriteEndElement();
             }
         }
+
         protected virtual void WriteAttributes(XmlTextWriter writer)
         {
             //properties
@@ -630,7 +681,13 @@ namespace Svg
 
         private Dictionary<string, string> WritePropertyAttributes(XmlTextWriter writer)
         {
-            var styles = _styles.ToDictionary(_styles => _styles.Key, _styles => _styles.Value.Last().Value);
+            var styles = _styles
+                .Where(style => style.Value.Where(v => v.Value.Value).Any())
+                .ToDictionary(
+                    _styles => _styles.Key,
+                    _styles => _styles.Value
+                        .Where(i => i.Value.Value)
+                        .Last().Value.Key);
 
             var opacityAttributes = new List<PropertyAttributeTuple>();
             var opacityValues = new Dictionary<string, float>();
@@ -805,6 +862,13 @@ namespace Svg
                     else if (!string.IsNullOrEmpty(content.Content))
                     {
                         writer.WriteString(content.Content);
+                    }
+                }
+                if (this.Children != null)
+                {
+                    foreach (SvgElement child in this.Children)
+                    {
+                        child.Write(writer);
                     }
                 }
             }
