@@ -852,7 +852,7 @@ namespace Svg
             if (this.Nodes.Any())
             {
                 SvgContentNode content;
-                foreach (var node in this.Nodes)
+                foreach (var node in NodesWithoutChildren())
                 {
                     content = node as SvgContentNode;
                     if (content == null)
@@ -871,6 +871,13 @@ namespace Svg
                         child.Write(writer);
                     }
                 }
+                IEnumerable<ISvgNode> NodesWithoutChildren()
+                {
+                    if (this.Children == null)
+                        return this.Nodes;
+                    return this.Nodes.Except(this.Children);
+                }
+
             }
             else
             {
