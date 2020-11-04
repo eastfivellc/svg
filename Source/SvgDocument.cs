@@ -585,7 +585,9 @@ namespace Svg
         /// Renders the <see cref="SvgDocument"/> and returns the image as a <see cref="Bitmap"/>.
         /// </summary>
         /// <returns>A <see cref="Bitmap"/> containing the rendered document.</returns>
-        public virtual Bitmap Draw()
+        public virtual Bitmap Draw(
+            int percentage100Width = 256,
+            int percentage100Height = 256)
         {
             //Trace.TraceInformation("Begin Render");
 
@@ -594,7 +596,9 @@ namespace Svg
             {
                 try
                 {
-                    var size = GetDimensions();
+                    var size = GetDimensions(
+                        percentage100Width:percentage100Width,
+                        percentage100Height:percentage100Height);
                     bitmap = new Bitmap((int)Math.Round(size.Width), (int)Math.Round(size.Height));
                 }
                 catch (ArgumentException e)
@@ -640,7 +644,7 @@ namespace Svg
         /// otherwise the aspect ratio is ignored.
         /// </summary>
         /// <returns>A <see cref="Bitmap"/> containing the rendered document.</returns>
-        public virtual Bitmap Draw(int rasterWidth, int rasterHeight)
+        public virtual Bitmap DrawRastered(int rasterWidth, int rasterHeight)
         {
             var imageSize = GetDimensions();
             var bitmapSize = imageSize;

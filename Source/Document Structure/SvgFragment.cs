@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Xml;
@@ -244,7 +244,9 @@ namespace Svg
             }
         }
 
-        public SizeF GetDimensions()
+        public SizeF GetDimensions(
+            int percentage100Width = 256,
+            int percentage100Height = 256)
         {
             float w, h;
             var isWidthperc = Width.Type == SvgUnitType.Percentage;
@@ -266,6 +268,8 @@ namespace Svg
             if (isWidthperc)
             {
                 w = (bounds.Width + bounds.X) * (Width.Value * 0.01f);
+                if (w <= 0)
+                    w = (Width.Value * 0.01f) * percentage100Width;
             }
             else
             {
@@ -274,6 +278,8 @@ namespace Svg
             if (isHeightperc)
             {
                 h = (bounds.Height + bounds.Y) * (Height.Value * 0.01f);
+                if (h <= 0)
+                    h = (Height.Value * 0.01f) * percentage100Height;
             }
             else
             {
