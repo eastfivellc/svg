@@ -243,7 +243,8 @@ namespace Svg
                     throw new SvgGdiPlusCannotBeLoadedException(e);
                 }
                 //If the Matrix creation is causing another type of exception we should just raise that one
-                throw;   
+                return;
+                // throw;   
             }
         }
 
